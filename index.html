@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PayDash Fusion — Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="app">
+    <!-- Auth modal / pages -->
+    <div id="auth-screen" class="screen">
+      <div class="auth-card">
+        <h1>PayDash Fusion</h1>
+        <div class="tabs">
+          <button id="tab-login" class="tab active">Login</button>
+          <button id="tab-register" class="tab">Register</button>
+        </div>
+
+        <form id="login-form" class="form">
+          <label>Email or Phone
+            <input type="text" id="login-identifier" placeholder="email or phone" />
+          </label>
+          <label>Password
+            <input type="password" id="login-password" placeholder="password" />
+          </label>
+          <button id="login-btn" class="btn">Login</button>
+        </form>
+
+        <form id="register-form" class="form hidden">
+          <label>Full name
+            <input type="text" id="register-name" placeholder="Full name" />
+          </label>
+          <label>Email
+            <input type="email" id="register-email" placeholder="Email" />
+          </label>
+          <label>Phone
+            <input type="text" id="register-phone" placeholder="Phone number" />
+          </label>
+          <label>Password
+            <input type="password" id="register-password" placeholder="Password" />
+          </label>
+          <button id="register-btn" class="btn">Create account</button>
+        </form>
+
+        <p class="muted">This is a static demo — replace API_BASE &amp; PAYSTACK_PUBLIC_KEY in script.js to connect to your backend and Paystack.</p>
+      </div>
+    </div>
+
+    <!-- Main dashboard -->
+    <div id="dashboard-screen" class="screen hidden">
+      <header class="topbar">
+        <div class="left">
+          <div class="profile">
+            <img src="assets/avatar.png" alt="avatar" class="avatar" />
+            <div>
+              <div id="greeting">Hi, User</div>
+              <div class="small muted" id="user-email">user@example.com</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="right">
+          <button id="logout-btn" class="icon-btn">Logout</button>
+        </div>
+      </header>
+
+      <main class="container">
+        <section class="balance-card card">
+          <div class="balance-top">
+            <div>
+              <div class="muted">Available balance</div>
+              <div id="balance-value" class="balance-value">₦0.00</div>
+            </div>
+
+            <div class="balance-actions">
+              <button id="toggle-balance" class="icon-btn eye">👁️</button>
+              <button id="add-money-btn" class="btn small">Add Money</button>
+            </div>
+          </div>
+
+          <div class="quick-actions">
+            <button data-action="topup" class="quick">To Paymoment</button>
+            <button data-action="bank" class="quick">To Bank</button>
+            <button data-action="withdraw" class="quick">Withdraw</button>
+          </div>
+        </section>
+
+        <section class="cards-row">
+          <div class="card action-grid">
+            <button data-service="airtime" class="grid-item">Airtime</button>
+            <button data-service="data" class="grid-item">Data</button>
+            <button data-service="betting" class="grid-item">Betting</button>
+            <button data-service="tv" class="grid-item">TV</button>
+            <button data-service="transport" class="grid-item">Transport</button>
+            <button data-service="electricity" class="grid-item">Electricity</button>
+          </div>
+
+          <div class="card transactions">
+            <div class="tr-header">
+              <h3>Transactions</h3>
+              <button id="refresh-transactions" class="icon-btn">⟳</button>
+            </div>
+            <ul id="tx-list" class="tx-list">
+              <!-- transactions injected here -->
+            </ul>
+          </div>
+        </section>
+      </main>
+
+      <!-- Add money modal -->
+      <div id="add-money-modal" class="modal hidden">
+        <div class="modal-card">
+          <h3>Add Money</h3>
+          <label>Amount (NGN)
+            <input type="number" id="add-amount" placeholder="1000" min="50" />
+          </label>
+          <label>Payment method
+            <select id="add-method">
+              <option value="card">Card (Paystack)</option>
+              <option value="transfer">Bank transfer</option>
+            </select>
+          </label>
+          <div class="modal-actions">
+            <button id="start-pay-btn" class="btn">Pay</button>
+            <button id="close-add-modal" class="btn ghost">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Service modal (airtime/data/electricity etc) -->
+      <div id="service-modal" class="modal hidden">
+        <div class="modal-card">
+          <h3 id="service-title">Service</h3>
+          <label>Phone/Customer ID
+            <input id="service-customer" placeholder="0813xxxxxxxx" />
+          </label>
+          <label>Amount
+            <input id="service-amount" type="number" placeholder="100" />
+          </label>
+          <div class="modal-actions">
+            <button id="service-pay-btn" class="btn">Pay</button>
+            <button id="close-service-modal" class="btn ghost">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toast -->
+      <div id="toast" class="toast hidden"></div>
+
+      <footer class="footer muted">
+        Built for demo • Replace API endpoints in script.js
+      </footer>
+    </div>
+  </div>
+
+  <script src="script.js" defer></script>
+</body>
+</html>

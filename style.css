@@ -1,0 +1,103 @@
+/* style.css - Mobile-first responsive styles for PayDash Fusion demo */
+:root{
+  --bg:#f4f6f9;
+  --card:#ffffff;
+  --accent:#0066ff;
+  --muted:#6b7280;
+  --success:#10b981;
+  --danger:#ef4444;
+  --glass: rgba(255,255,255,0.6);
+  font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+}
+
+*{box-sizing:border-box}
+html,body,#app{height:100%}
+body{
+  margin:0;
+  font-size:16px;
+  background:var(--bg);
+  color:#111827;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+
+/* screens */
+.screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.hidden{display:none}
+
+/* auth */
+.auth-card{
+  width:100%;
+  max-width:420px;
+  background:var(--card);
+  padding:22px;
+  border-radius:12px;
+  box-shadow:0 8px 30px rgba(2,6,23,0.08);
+}
+.auth-card h1{margin:0 0 12px;font-size:22px}
+.tabs{display:flex;gap:8px;margin-bottom:12px}
+.tab{
+  padding:8px 12px;border-radius:10px;border:none;background:transparent;cursor:pointer;font-weight:600;color:var(--muted)
+}
+.tab.active{background:var(--accent);color:#fff}
+.form label{display:block;margin-bottom:10px;font-size:13px}
+.form input, .form select{
+  width:100%;padding:10px 12px;border-radius:8px;border:1px solid #e6e9ef;background:#fff;margin-top:6px
+}
+.btn{
+  background:var(--accent);color:#fff;border:none;padding:10px 14px;border-radius:10px;font-weight:700;cursor:pointer;margin-top:8px
+}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid #e6efff}
+
+/* topbar */
+.topbar{
+  width:100%;
+  max-width:1200px;
+  display:flex;align-items:center;justify-content:space-between;padding:14px 20px;margin:12px auto;
+}
+.profile{display:flex;gap:12px;align-items:center}
+.avatar{width:48px;height:48px;border-radius:8px;object-fit:cover;background:#ddd;padding:4px}
+.small{font-size:12px}
+.muted{color:var(--muted)}
+
+/* container & cards */
+.container{max-width:1200px;margin:0 auto;padding:0 16px 80px}
+.card{background:var(--card);border-radius:12px;padding:14px;box-shadow:0 6px 18px rgba(2,6,23,0.06);margin-bottom:12px}
+.balance-card{display:flex;flex-direction:column;gap:12px}
+.balance-top{display:flex;justify-content:space-between;align-items:center}
+.balance-value{font-size:28px;font-weight:800;margin-top:4px}
+.balance-actions{display:flex;gap:10px;align-items:center}
+.icon-btn{border:0;background:transparent;cursor:pointer;padding:8px;border-radius:8px}
+.icon-btn.eye{font-size:18px}
+
+/* quick actions */
+.quick-actions{display:flex;gap:8px;flex-wrap:wrap}
+.quick{background:var(--glass);border-radius:8px;padding:8px 10px;border:1px solid rgba(2,6,23,0.04);cursor:pointer}
+
+/* cards row */
+.cards-row{display:grid;grid-template-columns:1fr;gap:12px;margin-top:12px}
+.action-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px}
+.grid-item{padding:12px;border-radius:10px;background:linear-gradient(180deg,#fff,#f8fafc);border:1px solid #eef2ff;cursor:pointer;font-weight:700}
+
+/* transactions */
+.transactions .tr-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.tx-list{list-style:none;padding:0;margin:0;max-height:240px;overflow:auto}
+.tx-item{display:flex;justify-content:space-between;padding:8px;border-bottom:1px solid #f3f4f6}
+.tx-item .meta{font-size:13px;color:var(--muted)}
+
+/* modal */
+.modal{position:fixed;inset:0;background:rgba(2,6,23,0.35);display:flex;align-items:center;justify-content:center;padding:20px;z-index:50}
+.modal-card{width:100%;max-width:420px;background:var(--card);padding:16px;border-radius:12px}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+
+/* toast */
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;background:#111827;color:#fff;padding:10px 16px;border-radius:10px;box-shadow:0 8px 20px rgba(2,6,23,0.2);z-index:60}
+
+/* footer */
+.footer{max-width:1200px;margin:20px auto;text-align:center;font-size:13px}
+
+/* responsive */
+@media(min-width:900px){
+  .screen{align-items:flex-start}
+  .cards-row{grid-template-columns:1fr 360px}
+}
