@@ -1,25 +1,23 @@
 /**
- * script.js - Static dashboard with placeholder API integration
+ * script.js - Static dashboard integrated with your backend
  *
- * How to use:
- * 1. Replace API_BASE with your backend base URL.
- * 2. Replace PAYSTACK_PUBLIC_KEY with your Paystack public key (for card payments).
- * 3. Optionally implement backend endpoints described below.
- *
- * The app falls back to mock data if API_BASE is not set or endpoints fail.
+ * CONFIG:
+ *  - API_BASE set to your backend base URL (provided).
+ *  - Replace PAYSTACK_PUBLIC_KEY with your Paystack public key if you want inline card payments.
+ *  - PAYSTACK_VERIFY_ENDPOINT is optional; if provided, the app will call it after Paystack callback to confirm the payment.
  */
 
-/* CONFIG: Replace with your real endpoints / keys */
+/* CONFIG: Integrated backend base URL */
 const CONFIG = {
-  API_BASE: '', // e.g. 'https://paymomentbackend.onrender.com/api'
-  PAYSTACK_PUBLIC_KEY: '', // e.g. 'pk_live_xxx'
-  PAYSTACK_VERIFY_ENDPOINT: '' // optional: backend route to verify payment (recommended)
+  API_BASE: 'https://paymomentbackend.onrender.com/api', // <-- your backend base
+  PAYSTACK_PUBLIC_KEY: '', // <-- put your Paystack public key here if using card payments
+  PAYSTACK_VERIFY_ENDPOINT: '/pay/verify' // optional verify route on your backend (full path will be API_BASE + this)
 };
 
-/* --- Mock data used when API not provided --- */
+/* --- Mock data fallback (used only if backend unreachable) --- */
 const MOCK = {
   token: 'demo-token',
-  user: { name: 'Eunice Chidi', email: 'eunice@example.com', phone: '08130000000' },
+  user: { name: 'Demo User', email: 'demo@example.com', phone: '08130000000' },
   balance: 15200.5,
   transactions: [
     { id: 'tx_1', title: 'Top up', meta: 'Card', amount: 5000, date: '2025-11-10' },
@@ -31,11 +29,12 @@ const MOCK = {
 /* --- Utilities --- */
 const $ = sel => document.querySelector(sel);
 const $$ = sel => Array.from(document.querySelectorAll(sel));
-const show = el => el.classList.remove('hidden');
-const hide = el => el.classList.add('hidden');
+const show = el => el && el.classList.remove('hidden');
+const hide = el => el && el.classList.add('hidden');
 
 function toast(msg, timeout = 3000) {
   const t = $('#toast');
+  if (!t) return alert(msg);
   t.textContent = msg;
   show(t);
   clearTimeout(t._timer);
@@ -56,7 +55,7 @@ const App = {
   transactions: []
 };
 
-/* --- DOM references --- */
+/* --- DOM refs --- */
 const authScreen = $('#auth-screen');
 const dashboardScreen = $('#dashboard-screen');
 const loginForm = $('#login-form');
@@ -70,35 +69,43 @@ const txList = $('#tx-list');
 const addMoneyModal = $('#add-money-modal');
 const serviceModal = $('#service-modal');
 
-/* --- Simple API wrapper (uses CONFIG.API_BASE) --- */
+/* --- API wrapper --- */
 async function apiFetch(path, options = {}) {
   const base = CONFIG.API_BASE && CONFIG.API_BASE.trim();
+  // If base missing, use mock (demo mode)
   if (!base) {
-    // no backend configured => simulate network with mock
-    await new Promise(r => setTimeout(r, 300));
-    // Simulate common endpoints
+    await new Promise(r => setTimeout(r, 250));
     if (path.includes('/auth/login')) return { ok: true, data: { token: MOCK.token, user: MOCK.user } };
     if (path.includes('/auth/register')) return { ok: true, data: { token: MOCK.token, user: MOCK.user } };
     if (path.includes('/me/balance')) return { ok: true, data: { balance: MOCK.balance } };
     if (path.includes('/me/transactions')) return { ok: true, data: { transactions: MOCK.transactions } };
     if (path.includes('/pay/service')) return { ok: true, data: { result: 'success', id: 'svc_' + Date.now() } };
-    return { ok: false, error: 'No API configured (demo mode)' };
+    if (path.includes('/pay/topup')) return { ok: true, data: { result: 'success', id: 'top_' + Date.now() } };
+    return { ok: false, error: 'No API configured' };
   }
 
+  // Build URL
   const url = base + path;
   const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
   if (App.token) headers['Authorization'] = 'Bearer ' + App.token;
 
   try {
     const res = await fetch(url, Object.assign({ headers }, options));
-    const json = await res.json();
+    const contentType = res.headers.get('content-type') || '';
+    let json = null;
+    if (contentType.includes('application/json')) json = await res.json();
+    else {
+      // attempt parse text
+      const text = await res.text();
+      try { json = JSON.parse(text); } catch(_) { json = text; }
+    }
     return { ok: res.ok, data: json, status: res.status };
   } catch (err) {
-    return { ok: false, error: err.message || err };
+    return { ok: false, error: err.message || String(err) };
   }
 }
 
-/* --- Auth handlers (demo-ready) --- */
+/* --- Auth --- */
 async function handleLogin(e) {
   e.preventDefault();
   const identifier = $('#login-identifier').value.trim();
@@ -106,13 +113,17 @@ async function handleLogin(e) {
   if (!identifier || !password) return toast('Provide email/phone and password');
 
   const res = await apiFetch('/auth/login', { method: 'POST', body: JSON.stringify({ identifier, password }) });
-  if (res.ok) {
-    App.token = res.data.token;
-    App.user = res.data.user;
+  if (res.ok && res.data && (res.data.token || res.data.access_token)) {
+    App.token = res.data.token || res.data.access_token;
+    App.user = res.data.user || res.data.profile || MOCK.user;
+    localStorage.setItem('pd_token', App.token);
+    localStorage.setItem('pd_user', JSON.stringify(App.user));
     onLoggedIn();
     toast('Logged in');
   } else {
-    toast('Login failed: ' + (res.error || 'server error'));
+    // Try to display error message from backend
+    const err = res.data?.message || res.data?.error || res.error || 'Login failed';
+    toast(err);
   }
 }
 
@@ -125,13 +136,16 @@ async function handleRegister(e) {
   if (!name || !email || !password) return toast('Complete required fields');
 
   const res = await apiFetch('/auth/register', { method: 'POST', body: JSON.stringify({ name, email, phone, password }) });
-  if (res.ok) {
-    App.token = res.data.token;
-    App.user = res.data.user;
+  if (res.ok && res.data && (res.data.token || res.data.access_token)) {
+    App.token = res.data.token || res.data.access_token;
+    App.user = res.data.user || res.data.profile || MOCK.user;
+    localStorage.setItem('pd_token', App.token);
+    localStorage.setItem('pd_user', JSON.stringify(App.user));
     onLoggedIn();
     toast('Account created');
   } else {
-    toast('Register failed: ' + (res.error || 'server error'));
+    const err = res.data?.message || res.data?.error || res.error || 'Register failed';
+    toast(err);
   }
 }
 
@@ -148,10 +162,11 @@ async function onLoggedIn() {
 /* --- Balance & transactions --- */
 async function refreshBalance() {
   const res = await apiFetch('/me/balance');
-  if (res.ok) {
-    App.balance = res.data.balance;
+  if (res.ok && typeof res.data?.balance !== 'undefined') {
+    App.balance = Number(res.data.balance) || 0;
+  } else if (res.ok && typeof res.data === 'number') {
+    App.balance = Number(res.data);
   } else {
-    // fallback to mock or zero
     App.balance = MOCK.balance || 0;
   }
   updateBalanceUI();
@@ -163,8 +178,10 @@ function updateBalanceUI() {
 
 async function loadTransactions() {
   const res = await apiFetch('/me/transactions');
-  if (res.ok) {
+  if (res.ok && Array.isArray(res.data?.transactions)) {
     App.transactions = res.data.transactions;
+  } else if (res.ok && Array.isArray(res.data)) {
+    App.transactions = res.data;
   } else {
     App.transactions = MOCK.transactions;
   }
@@ -180,18 +197,22 @@ function renderTransactions() {
   App.transactions.forEach(tx => {
     const li = document.createElement('li');
     li.className = 'tx-item';
+    const title = tx.title || tx.description || tx.type || 'Transaction';
+    const meta = tx.meta || tx.source || tx.note || '';
+    const date = tx.date || tx.created_at || '';
+    const amount = Number(tx.amount || tx.value || 0);
     li.innerHTML = `
       <div>
-        <div><strong>${tx.title}</strong></div>
-        <div class="meta">${tx.meta} • ${tx.date}</div>
+        <div><strong>${title}</strong></div>
+        <div class="meta">${meta} • ${date}</div>
       </div>
-      <div>${tx.amount < 0 ? '-' : ''}<strong>${currency(Math.abs(tx.amount))}</strong></div>
+      <div>${amount < 0 ? '-' : ''}<strong>${currency(Math.abs(amount))}</strong></div>
     `;
     txList.appendChild(li);
   });
 }
 
-/* --- Add money (Paystack inline integration if key provided) --- */
+/* --- Add money (Paystack inline if configured) --- */
 function openAddMoneyModal() { show(addMoneyModal); }
 function closeAddMoneyModal() { hide(addMoneyModal); }
 
@@ -200,58 +221,61 @@ async function startPayment() {
   const method = $('#add-method').value;
   if (!amount || amount < 50) return toast('Provide a valid amount (min 50)');
 
-  // If Paystack key available and method card: use Paystack inline
+  // Card payment via Paystack inline if configured
   if (method === 'card' && CONFIG.PAYSTACK_PUBLIC_KEY) {
-    const handler = window.PaystackPop && window.PaystackPop.setup ? window.PaystackPop.setup({
-      key: CONFIG.PAYSTACK_PUBLIC_KEY,
-      email: App.user?.email || 'customer@example.com',
-      amount: Math.round(amount * 100),
-      currency: 'NGN',
-      metadata: { custom_fields: [{ display_name: "Customer Phone", variable_name: "phone", value: App.user?.phone || '' }] },
-      onClose: function() { toast('Payment closed'); },
-      callback: async function(response) {
-        toast('Payment success, verifying...');
-        // Optionally verify via backend
-        if (CONFIG.PAYSTACK_VERIFY_ENDPOINT) {
-          const v = await apiFetch(CONFIG.PAYSTACK_VERIFY_ENDPOINT + '?reference=' + encodeURIComponent(response.reference));
-          if (v.ok) {
-            toast('Payment verified');
-            await refreshBalance();
-            await loadTransactions();
-          } else {
-            toast('Verification failed');
+    if (!window.PaystackPop || !window.PaystackPop.setup) {
+      toast('Loading Paystack script...');
+      loadPaystackKey();
+      // short wait for script to attach
+      await new Promise(r => setTimeout(r, 800));
+    }
+
+    if (window.PaystackPop && window.PaystackPop.setup) {
+      const handler = window.PaystackPop.setup({
+        key: CONFIG.PAYSTACK_PUBLIC_KEY,
+        email: App.user?.email || 'customer@example.com',
+        amount: Math.round(amount * 100),
+        currency: 'NGN',
+        metadata: { custom_fields: [{ display_name: "Customer Phone", variable_name: "phone", value: App.user?.phone || '' }] },
+        onClose: function() { toast('Payment window closed'); },
+        callback: async function(response) {
+          toast('Payment successful. Verifying...');
+          // Optionally call backend verify endpoint
+          if (CONFIG.PAYSTACK_VERIFY_ENDPOINT) {
+            const verifyPath = (CONFIG.PAYSTACK_VERIFY_ENDPOINT.startsWith('/')) ? CONFIG.PAYSTACK_VERIFY_ENDPOINT : '/' + CONFIG.PAYSTACK_VERIFY_ENDPOINT;
+            const v = await apiFetch(verifyPath + '?reference=' + encodeURIComponent(response.reference));
+            if (v.ok) {
+              toast('Payment verified');
+            } else {
+              toast('Verification failed');
+            }
           }
-        } else {
-          // No verify endpoint — just assume success
           await refreshBalance();
           await loadTransactions();
         }
-      }
-    }) : null;
-
-    if (handler) {
+      });
       handler.openIframe();
       closeAddMoneyModal();
       return;
     } else {
-      toast('Paystack script not loaded; falling back to demo top up');
+      toast('Paystack failed to initialize; falling back to transfer flow.');
     }
   }
 
-  // Fallback: call /pay/topup or simulate success
-  const res = await apiFetch('/pay/topup', { method: 'POST', body: JSON.stringify({ amount }) });
+  // Bank transfer / fallback flow
+  const res = await apiFetch('/pay/topup', { method: 'POST', body: JSON.stringify({ amount, method }) });
   if (res.ok) {
-    toast('Top up success');
-    // refresh local copy
+    toast('Top up initiated');
     await refreshBalance();
     await loadTransactions();
     closeAddMoneyModal();
   } else {
-    toast('Top up failed: ' + (res.error || 'server error'));
+    const err = res.data?.message || res.data?.error || res.error || 'Top up failed';
+    toast(err);
   }
 }
 
-/* --- Service payments (airtime, data, electricity, tv, betting, transport) --- */
+/* --- Service payments --- */
 let currentService = null;
 function openServiceModal(service) {
   currentService = service;
@@ -267,7 +291,6 @@ async function payService() {
   const amount = Number($('#service-amount').value);
   if (!customer || !amount || amount <= 0) return toast('Complete the service form');
 
-  // call backend
   const res = await apiFetch('/pay/service', { method: 'POST', body: JSON.stringify({ service: currentService, customer, amount }) });
   if (res.ok) {
     toast('Service paid');
@@ -275,7 +298,8 @@ async function payService() {
     await loadTransactions();
     closeServiceModal();
   } else {
-    toast('Service failed: ' + (res.error || 'server error'));
+    const err = res.data?.message || res.data?.error || res.error || 'Service payment failed';
+    toast(err);
   }
 }
 
@@ -292,6 +316,7 @@ function wireUI() {
   // logout
   $('#logout-btn').addEventListener('click', () => {
     App.token = null; App.user = null;
+    localStorage.removeItem('pd_token'); localStorage.removeItem('pd_user');
     hide(dashboardScreen); show(authScreen);
   });
 
@@ -337,35 +362,16 @@ function init() {
   wireUI();
   loadPaystackKey();
 
-  // If token exists in localStorage — auto-login (demo)
-  if (localStorage.getItem('pd_token')) {
-    App.token = localStorage.getItem('pd_token');
-    App.user = JSON.parse(localStorage.getItem('pd_user') || 'null') || MOCK.user;
+  // Auto-login if token present
+  const token = localStorage.getItem('pd_token');
+  if (token) {
+    App.token = token;
+    try { App.user = JSON.parse(localStorage.getItem('pd_user')); } catch(_) { App.user = MOCK.user; }
     onLoggedIn();
   } else {
-    // show auth by default
     hide(dashboardScreen);
     show(authScreen);
   }
-
-  // persist login for demo when user logs in (override handleLogin to store)
-  const originalHandleLogin = handleLogin;
-  window.handleLogin = async function(e) {
-    await originalHandleLogin(e);
-    if (App.token) {
-      localStorage.setItem('pd_token', App.token);
-      localStorage.setItem('pd_user', JSON.stringify(App.user));
-    }
-  };
-
-  const originalHandleRegister = handleRegister;
-  window.handleRegister = async function(e) {
-    await originalHandleRegister(e);
-    if (App.token) {
-      localStorage.setItem('pd_token', App.token);
-      localStorage.setItem('pd_user', JSON.stringify(App.user));
-    }
-  };
 }
 
 document.addEventListener('DOMContentLoaded', init);
